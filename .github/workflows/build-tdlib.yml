@@ -1,0 +1,79 @@
+name: Build TDLib for amd64 / arm64 / armhf
+
+on:
+  push:
+    branches: [main]        # adjust as needed
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # Build the same workflow three times, once per architecture
+    strategy:
+      matrix:
+        include:
+          - arch: amd64   # 64-bit x86
+            platform: linux/amd64
+          - arch: arm64   # 64-bit ARM
+            platform: linux/arm64
+          - arch: armhf   # 32-bit ARM (armv7 / arm-v7l)
+            platform: linux/arm/v7    # a.k.a. armhf
+
+    steps:
+      #######################################################################
+      # 1) Enable multi-arch emulation so the runner can execute ARM images
+      #######################################################################
+      - name: Prepare QEMU for multi-arch containers
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      #######################################################################
+      # 2) Check out your repository (needed only if you rely on its files)
+      #######################################################################
+      - uses: actions/checkout@v4
+
+      #######################################################################
+      # 3) Run the full build script inside an Ubuntu 24.04 container that
+      #    matches the desired CPU architecture from the matrix.
+      #    The workspace is mounted at /work so the artefacts survive after
+      #    the container exits.
+      #######################################################################
+      - name: Build TDLib (${{ matrix.arch }})
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} \
+            -v "$PWD":/work -w /work ubuntu:24.04 /bin/bash -euxc "
+              # --- your original recipe, verbatim --------------------------
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
+              apt-get install -y \
+                make git zlib1g-dev libssl-dev gperf php-cli \
+                cmake clang-18 libc++-18-dev libc++abi-18-dev
+
+              git clone --depth 1 https://github.com/tdlib/td.git
+              cd td
+              rm -rf build
+              mkdir build && cd build
+
+              CXXFLAGS=\"-stdlib=libc++\" CC=/usr/bin/clang-18 CXX=/usr/bin/clang++-18 \
+                cmake -DCMAKE_BUILD_TYPE=Release \
+                      -DCMAKE_INSTALL_PREFIX:PATH=../tdlib \
+                      ..
+
+              cmake --build . --target install
+              # -------------------------------------------------------------
+            "
+
+      #######################################################################
+      # 4) Upload the freshly-built library (td/tdlib) so every PR and
+      #    branch push has downloadable artefacts per architecture.
+      #######################################################################
+      - name: Upload libtdjson (${{ matrix.arch }})
+        uses: actions/upload-artifact@v4
+        with:
+          # 👇 any name you like
+          name: libtdjson-${{ matrix.arch }}
+          # 👇 pick only the .so file, whatever its version suffix is
+          path: td/tdlib/lib/libtdjson.so*
