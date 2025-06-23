@@ -26,6 +26,15 @@ jobs:
         run: |
           sudo dpkg --add-architecture arm64
           sudo dpkg --add-architecture armhf
+          # 2) Tell the default mirrors to serve *only* amd64
+          sudo sed -Ei 's|^deb (.+)$|deb [arch=amd64] \1|' /etc/apt/sources.list
+          
+          # 3) Add a new list for arm64 + armhf that points to Ubuntu-Ports
+          sudo tee /etc/apt/sources.list.d/ubuntu-ports.list >/dev/null <<'EOF'
+          deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
+          deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
+          deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
+          EOF
           sudo apt-get update
           
           sudo apt-get install -y \
