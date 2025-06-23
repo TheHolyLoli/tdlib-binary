@@ -45,6 +45,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=../tdlib .. \
             ${CMAKE_EXTRA}
+            
+          cmake --build . --target prepare_cross_compiling
 
           cmake --build . --target install
 
