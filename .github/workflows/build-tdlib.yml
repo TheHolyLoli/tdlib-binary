@@ -57,7 +57,7 @@ jobs:
                       -DCMAKE_INSTALL_PREFIX:PATH=../tdlib \
                       ..
 
-              cmake --build . --target install
+              cmake --build . --target install -j $(nproc)
             "
 
       #######################################################################
