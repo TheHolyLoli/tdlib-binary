@@ -2,114 +2,69 @@ name: Build TDLib for amd64 / arm64 / armhf
 
 on:
   push:
-    branches: [main]        # adjust as needed
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
+          # 64-bit x86 – GitHub-hosted
           - arch: amd64
-            toolchain: ""
+            runs_on: ubuntu-latest
+            platform: linux/amd64      # still useful for docker
+          # 64-bit ARM – GitHub-hosted (preview) or your own
           - arch: arm64
-            toolchain: .github/toolchains/arm64.cmake
+            runs_on: ubuntu-24.04-arm64   # or ubuntu-22.04-arm64, or ["self-hosted","ARM64"]
+            platform: linux/arm64
+          # 32-bit ARM/v7 – **self-hosted** only
           - arch: armhf
-            toolchain: .github/toolchains/armhf.cmake
+            runs_on: ubuntu-24.04-arm
+            platform: linux/arm
+
+    # Pick the runner declared in the matrix line above
+    runs-on: ${{ matrix.runs_on }}
 
     steps:
-            
-      # -------------------------------------------------------
-      # A. set up repos **only for cross jobs**
-      # -------------------------------------------------------
-      - name: Rewrite APT sources for ARM jobs
-        if: matrix.arch != 'amd64'          # run only for arm64 / armhf
-        shell: bash
-        run: |
-          set -eux
-
-          # 1) Enable the foreign architecture we’re about to build
-          sudo dpkg --add-architecture ${{ matrix.arch }}
-      
-          # 2) Comment-out every security.ubuntu.com line
-          sudo find /etc/apt -type f -name '*.list' -exec \
-               sed -Ei '/security\.ubuntu\.com/ s/^/#/' {} +
-      
-          # 3) Tell archive.ubuntu.com to serve *only* amd64
-          sudo sed -Ei 's|^deb (.*archive\.ubuntu\.com.*)$|deb [arch=amd64] \1|' /etc/apt/sources.list || true
-          sudo find /etc/apt/sources.list.d -name '*.list' -exec \
-               sed -Ei 's|^deb (.*archive\.ubuntu\.com.*)$|deb [arch=amd64] \1|' {} +
-      
-          # 4) Add ports.ubuntu.com lines for this ARM arch (main + updates + security)
-          sudo tee /etc/apt/sources.list.d/ports-${{ matrix.arch }}.list >/dev/null <<EOF
-          deb [arch=${{ matrix.arch }}] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
-          deb [arch=${{ matrix.arch }}] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
-          deb [arch=${{ matrix.arch }}] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
-          EOF
-      
-          # 5) Refresh package indexes — now APT talks only to archive (amd64) + ports (ARM)
-          sudo apt-get update -o Acquire::Retries=3
-      
-      # -------------------------------------------------------
-      # B. install the right dev packages per job
-      # -------------------------------------------------------
-      - name: Install build dependencies
-        shell: bash
-        run: |
-          common_pkgs="make git gperf php-cli cmake g++ zlib1g-dev libssl-dev"
-          if [ "${{ matrix.arch }}" = "amd64" ]; then
-            sudo apt-get install -y $common_pkgs                      # amd64 only
-          elif [ "${{ matrix.arch }}" = "arm64" ]; then
-            sudo apt-get install -y $common_pkgs \
-              gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-              zlib1g-dev:arm64 libssl-dev:arm64
-          else
-            sudo apt-get install -y $common_pkgs \
-              gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
-              zlib1g-dev:armhf libssl-dev:armhf
-          fi
-          git clone --depth 1 https://github.com/tdlib/td.git
-          mkdir -p td/build && cd td/build
-      
-      # -------------------------------------------------------
-      # C. run cross-prep steps only when cross-compiling
-      # -------------------------------------------------------
-      - name: Prepare cross-compiling
-        if: matrix.arch != ''
-        shell: bash
-        run: |
-          cmake --build . --target prepare_cross_compiling
-
-
-
-
-      - name: Configure & build (${{ matrix.arch }})
-        run: |
-          CMAKE_EXTRA=""
-          if [ -n "${{ matrix.toolchain }}" ]; then
-            CMAKE_EXTRA="-DCMAKE_TOOLCHAIN_FILE=${GITHUB_WORKSPACE}/${{ matrix.toolchain }}"
-          fi
-
-          cmake .. \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=../tdlib .. \
-            ${CMAKE_EXTRA}
-            
-          cmake --build . --target prepare_cross_compiling
-
-          cmake --build . --target install
-
+      #######################################################################
+      # 1) Check out your code
+      #######################################################################
+      - uses: actions/checkout@v4
 
       #######################################################################
-      # 4) Upload the freshly-built library (td/tdlib) so every PR and
-      #    branch push has downloadable artefacts per architecture.
+      # 2) Build TDLib inside an Ubuntu 24.04 container that matches
+      #    the native CPU.  No QEMU needed because host == target.
+      #######################################################################
+      - name: Build TDLib (${{ matrix.arch }})
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} \
+            -v "$PWD":/work -w /work ubuntu:24.04 /bin/bash -euxc "
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
+              apt-get install -y \
+                make git zlib1g-dev libssl-dev gperf php-cli \
+                cmake clang-18 libc++-18-dev libc++abi-18-dev
+
+              git clone --depth 1 https://github.com/tdlib/td.git
+              cd td
+              rm -rf build
+              mkdir build && cd build
+
+              CXXFLAGS=\"-stdlib=libc++\" CC=/usr/bin/clang-18 CXX=/usr/bin/clang++-18 \
+                cmake -DCMAKE_BUILD_TYPE=Release \
+                      -DCMAKE_INSTALL_PREFIX:PATH=../tdlib \
+                      ..
+
+              cmake --build . --target install
+            "
+
+      #######################################################################
+      # 3) Upload the freshly-built libtdjson for each architecture
       #######################################################################
       - name: Upload libtdjson (${{ matrix.arch }})
         uses: actions/upload-artifact@v4
         with:
-          # 👇 any name you like
           name: libtdjson-${{ matrix.arch }}
-          # 👇 pick only the .so file, whatever its version suffix is
           path: td/tdlib/lib/libtdjson.so*
