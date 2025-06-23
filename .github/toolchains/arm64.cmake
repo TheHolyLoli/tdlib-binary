@@ -9,6 +9,8 @@ set(CMAKE_CXX_COMPILER clang++-18)
 # Specify the target architecture (ARM64, aarch64)
 set(CMAKE_C_FLAGS      "--target=aarch64-linux-gnu -march=armv8-a -fPIC")
 set(CMAKE_CXX_FLAGS    "--target=aarch64-linux-gnu -march=armv8-a -fPIC")
+set(OPENSSL_ROOT_DIR /usr/aarch64-linux-gnu)
+set(OPENSSL_LIBRARIES /usr/aarch64-linux-gnu/lib)
 
 # Where the cross-compilation libraries/headers are located
 set(CMAKE_FIND_ROOT_PATH /usr/aarch64-linux-gnu)
