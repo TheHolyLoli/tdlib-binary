@@ -38,7 +38,7 @@ jobs:
       #    the native CPU.  No QEMU needed because host == target.
       #######################################################################
       - name: Build TDLib (${{ matrix.arch }})
-       run: |
+        run: |
           git clone --depth 1 https://github.com/tdlib/td.git
           cd td
           rm -rf build
