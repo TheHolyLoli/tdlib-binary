@@ -38,27 +38,19 @@ jobs:
       #    the native CPU.  No QEMU needed because host == target.
       #######################################################################
       - name: Build TDLib (${{ matrix.arch }})
-        run: |
-          docker run --rm --platform ${{ matrix.platform }} \
-            -v "$PWD":/work -w /work ubuntu:24.04 /bin/bash -euxc "
-              apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
-              apt-get install -y \
-                make git zlib1g-dev libssl-dev gperf php-cli \
-                cmake clang-18 libc++-18-dev libc++abi-18-dev
+       run: |
+          git clone --depth 1 https://github.com/tdlib/td.git
+          cd td
+          rm -rf build
+          mkdir build && cd build
 
-              git clone --depth 1 https://github.com/tdlib/td.git
-              cd td
-              rm -rf build
-              mkdir build && cd build
-
-              CXXFLAGS=\"-stdlib=libc++\" CC=/usr/bin/clang-18 CXX=/usr/bin/clang++-18 \
-                cmake -DCMAKE_BUILD_TYPE=Release \
-                      -DCMAKE_INSTALL_PREFIX:PATH=../tdlib \
-                      ..
-
-              cmake --build . --target install -j $(nproc)
-            "
+          CXXFLAGS="-stdlib=libc++" \
+            CC=/usr/bin/clang-18 \
+            CXX=/usr/bin/clang++-18 \
+            cmake -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_INSTALL_PREFIX:PATH=../tdlib \
+                  ..
+          cmake --build . --target install -j $(nproc)
 
       #######################################################################
       # 3) Upload the freshly-built libtdjson for each architecture
