@@ -13,8 +13,9 @@ set(CMAKE_CXX_COMPILER      clang++-18)
 # Cross-compile flags for ARM (armv7, hard-float, NEON/SIMD)
 set(CMAKE_C_FLAGS_INIT     "--target=arm-linux-gnueabihf -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard")
 set(CMAKE_CXX_FLAGS_INIT   "${CMAKE_C_FLAGS_INIT}")
-set(OPENSSL_ROOT_DIR /usr/aarch64-linux-gnu)
-set(OPENSSL_LIBRARIES /usr/aarch64-linux-gnu/lib)
+set(OPENSSL_ROOT_DIR /usr/arm-linux-gnueabihf)
+set(OPENSSL_LIBRARIES /usr/arm-linux-gnueabihf/lib)
+
 
 # Where the cross libraries/headers live (typically the sysroot path)
 set(CMAKE_FIND_ROOT_PATH   /usr/arm-linux-gnueabihf)
