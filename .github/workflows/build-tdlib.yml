@@ -43,7 +43,7 @@ jobs:
 
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=../tdlib \
+            -DCMAKE_INSTALL_PREFIX=../tdlib .. \
             ${CMAKE_EXTRA}
 
           cmake --build . --target install
