@@ -30,8 +30,11 @@ jobs:
         run: |
           sudo dpkg --add-architecture ${{ matrix.arch }}
       
-          # limit the default mirrors to amd64 so they stop serving the foreign arch
-          sudo sed -Ei 's|^deb (.+)$|deb [arch=amd64] \1|' /etc/apt/sources.list
+          #    # 2) comment-out every security.ubuntu.com entry everywhere
+          sudo find /etc/apt -name '*.list' -exec \
+          sed -Ei '/security\.ubuntu\.com/ s/^/#/' {} +
+      
+
       
           # add ports.ubuntu.com just for the foreign arch
           sudo tee /etc/apt/sources.list.d/ubuntu-ports.list >/dev/null <<EOF
