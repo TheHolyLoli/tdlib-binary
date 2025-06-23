@@ -24,25 +24,34 @@ jobs:
       # -------------------------------------------------------
       # A. set up repos **only for cross jobs**
       # -------------------------------------------------------
-      - name: Enable ${{ matrix.arch }} repos (ports mirror)
-        if: matrix.arch != ''
+      - name: Rewrite APT sources for ARM jobs
+        if: matrix.arch != ''          # run only for arm64 / armhf
         shell: bash
         run: |
+          set -eux
+      
+          # 1) enable the single foreign arch we’re about to build
           sudo dpkg --add-architecture ${{ matrix.arch }}
       
-          #    # 2) comment-out every security.ubuntu.com entry everywhere
+          # 2) comment-out every security.ubuntu.com entry everywhere
           sudo find /etc/apt -name '*.list' -exec \
-          sed -Ei '/security\.ubuntu\.com/ s/^/#/' {} +
+            sed -Ei '/security\.ubuntu\.com/ s/^/#/' {} +
       
-
+          # 3) limit the remaining Ubuntu mirrors to amd64 only
+          sudo sed -Ei 's|^deb (.*archive\.ubuntu\.com.*)$|deb [arch=amd64] \1|' \
+            /etc/apt/sources.list || true
+          sudo find /etc/apt/sources.list.d -name '*.list' -exec \
+            sed -Ei 's|^deb (.*archive\.ubuntu\.com.*)$|deb [arch=amd64] \1|' {} +
       
-          # add ports.ubuntu.com just for the foreign arch
-          sudo tee /etc/apt/sources.list.d/ubuntu-ports.list >/dev/null <<EOF
+          # 4) add ports.ubuntu.com for the foreign arch (main + updates + security)
+          sudo tee /etc/apt/sources.list.d/ubuntu-ports-${{ matrix.arch }}.list >/dev/null <<EOF
           deb [arch=${{ matrix.arch }}] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
           deb [arch=${{ matrix.arch }}] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
           deb [arch=${{ matrix.arch }}] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
           EOF
-          sudo apt-get update
+      
+          # 5) refresh indexes – should hit only archive (amd64) + ports (arm*)
+          sudo apt-get update -o Acquire::Retries=3
       
       # -------------------------------------------------------
       # B. install the right dev packages per job
