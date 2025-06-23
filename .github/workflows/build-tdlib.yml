@@ -39,17 +39,15 @@ jobs:
       #######################################################################
       - name: Build TDLib (${{ matrix.arch }})
         run: |
-          git clone --depth 1 https://github.com/tdlib/td.git
+          sudo apt-get update
+          sudo apt-get upgrade
+          sudo apt-get install make git zlib1g-dev libssl-dev gperf php-cli cmake clang-18 libc++-18-dev libc++abi-18-dev
+          git clone https://github.com/tdlib/td.git
           cd td
           rm -rf build
-          mkdir build && cd build
-
-          CXXFLAGS="-stdlib=libc++" \
-            CC=/usr/bin/clang-18 \
-            CXX=/usr/bin/clang++-18 \
-            cmake -DCMAKE_BUILD_TYPE=Release \
-                  -DCMAKE_INSTALL_PREFIX:PATH=../tdlib \
-                  ..
+          mkdir build
+          cd build
+          CXXFLAGS="-stdlib=libc++" CC=/usr/bin/clang-18 CXX=/usr/bin/clang++-18 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=../tdlib ..
           cmake --build . --target install -j $(nproc)
 
       #######################################################################
