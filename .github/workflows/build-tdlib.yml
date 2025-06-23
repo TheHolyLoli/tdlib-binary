@@ -24,20 +24,20 @@ jobs:
       # -------------------------------------------------------
       # A. set up repos **only for cross jobs**
       # -------------------------------------------------------
-      - name: Enable ${{ matrix.deb_arch }} repos (ports mirror)
-        if: matrix.deb_arch != ''
+      - name: Enable ${{ matrix.arch }} repos (ports mirror)
+        if: matrix.arch != ''
         shell: bash
         run: |
-          sudo dpkg --add-architecture ${{ matrix.deb_arch }}
+          sudo dpkg --add-architecture ${{ matrix.arch }}
       
           # limit the default mirrors to amd64 so they stop serving the foreign arch
           sudo sed -Ei 's|^deb (.+)$|deb [arch=amd64] \1|' /etc/apt/sources.list
       
           # add ports.ubuntu.com just for the foreign arch
           sudo tee /etc/apt/sources.list.d/ubuntu-ports.list >/dev/null <<EOF
-          deb [arch=${{ matrix.deb_arch }}] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
-          deb [arch=${{ matrix.deb_arch }}] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
-          deb [arch=${{ matrix.deb_arch }}] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
+          deb [arch=${{ matrix.arch }}] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
+          deb [arch=${{ matrix.arch }}] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
+          deb [arch=${{ matrix.arch }}] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
           EOF
           sudo apt-get update
       
@@ -48,9 +48,9 @@ jobs:
         shell: bash
         run: |
           common_pkgs="make git gperf php-cli cmake g++ zlib1g-dev libssl-dev"
-          if [ -z "${{ matrix.deb_arch }}" ]; then
+          if [ -z "${{ matrix.arch }}" ]; then
             sudo apt-get install -y $common_pkgs                      # amd64 only
-          elif [ "${{ matrix.deb_arch }}" = "arm64" ]; then
+          elif [ "${{ matrix.arch }}" = "arm64" ]; then
             sudo apt-get install -y $common_pkgs \
               gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
               zlib1g-dev:arm64 libssl-dev:arm64
@@ -66,7 +66,7 @@ jobs:
       # C. run cross-prep steps only when cross-compiling
       # -------------------------------------------------------
       - name: Prepare cross-compiling
-        if: matrix.deb_arch != ''
+        if: matrix.arch != ''
         shell: bash
         run: |
           cmake --build . --target prepare_cross_compiling
