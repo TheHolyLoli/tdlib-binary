@@ -24,12 +24,22 @@ jobs:
 
       - name: Install build deps + cross compilers
         run: |
+          sudo dpkg --add-architecture arm64
+          sudo dpkg --add-architecture armhf
           sudo apt-get update
+          
           sudo apt-get install -y \
-            make git zlib1g-dev libssl-dev gperf php-cli \
-            cmake g++ \
-            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-            gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+            make git gperf php-cli cmake g++ \
+            # native (amd64) dev libraries
+            zlib1g-dev   libssl-dev \
+            # arm64 dev libraries
+            gcc-aarch64-linux-gnu  g++-aarch64-linux-gnu \
+            zlib1g-dev:arm64       libssl-dev:arm64 \
+            # armhf dev libraries
+            gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
+            zlib1g-dev:armhf        libssl-dev:armhf
+
+
 
       - name: Configure & build (${{ matrix.arch }})
         run: |
