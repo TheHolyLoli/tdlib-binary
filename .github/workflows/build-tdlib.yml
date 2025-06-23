@@ -46,7 +46,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX=../tdlib \
             ${CMAKE_EXTRA}
 
-          cmake --build . --target install -- -j$(nproc)
+          cmake --build . --target install
 
 
       #######################################################################
