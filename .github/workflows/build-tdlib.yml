@@ -8,63 +8,45 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-
-    # Build the same workflow three times, once per architecture
     strategy:
       matrix:
         include:
-          - arch: amd64   # 64-bit x86
-            platform: linux/amd64
-          - arch: arm64   # 64-bit ARM
-            platform: linux/arm64
-          - arch: armhf   # 32-bit ARM (armv7 / arm-v7l)
-            platform: linux/arm/v7    # a.k.a. armhf
+          - arch: amd64
+            toolchain: ""
+          - arch: arm64
+            toolchain: .github/toolchains/arm64.cmake
+          - arch: armhf
+            toolchain: .github/toolchains/armhf.cmake
 
     steps:
-      #######################################################################
-      # 1) Enable multi-arch emulation so the runner can execute ARM images
-      #######################################################################
-      - name: Prepare QEMU for multi-arch containers
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: all
-
-      #######################################################################
-      # 2) Check out your repository (needed only if you rely on its files)
-      #######################################################################
       - uses: actions/checkout@v4
 
-      #######################################################################
-      # 3) Run the full build script inside an Ubuntu 24.04 container that
-      #    matches the desired CPU architecture from the matrix.
-      #    The workspace is mounted at /work so the artefacts survive after
-      #    the container exits.
-      #######################################################################
-      - name: Build TDLib (${{ matrix.arch }})
+      - name: Install build deps + cross compilers
         run: |
-          docker run --rm --platform ${{ matrix.platform }} \
-            -v "$PWD":/work -w /work ubuntu:24.04 /bin/bash -euxc "
-              # --- your original recipe, verbatim --------------------------
-              apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
-              apt-get install -y \
-                make git zlib1g-dev libssl-dev gperf php-cli \
-                cmake clang-18 libc++-18-dev libc++abi-18-dev
+          sudo apt-get update
+          sudo apt-get install -y \
+            make git zlib1g-dev libssl-dev gperf php-cli \
+            cmake clang-18 libc++-18-dev libc++abi-18-dev \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
 
-              git clone --depth 1 https://github.com/tdlib/td.git
-              cd td
-              rm -rf build
-              mkdir build && cd build
+      - name: Configure & build (${{ matrix.arch }})
+        run: |
+          git clone --depth 1 https://github.com/tdlib/td.git
+          mkdir -p td/build && cd td/build
 
-              CXXFLAGS=\"-stdlib=libc++\" CC=/usr/bin/clang-18 CXX=/usr/bin/clang++-18 \
-                cmake -DCMAKE_BUILD_TYPE=Release \
-                      -DCMAKE_INSTALL_PREFIX:PATH=../tdlib \
-                      ..
+          CMAKE_EXTRA=""
+          if [ -n "${{ matrix.toolchain }}" ]; then
+            CMAKE_EXTRA="-DCMAKE_TOOLCHAIN_FILE=${{ matrix.toolchain }}"
+          fi
 
-              cmake --build . --target install
-              # -------------------------------------------------------------
-            "
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=../tdlib \
+            ${CMAKE_EXTRA}
+
+          cmake --build . --target install -- -j$(nproc)
+
 
       #######################################################################
       # 4) Upload the freshly-built library (td/tdlib) so every PR and
