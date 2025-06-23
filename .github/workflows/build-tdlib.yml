@@ -25,32 +25,30 @@ jobs:
       # A. set up repos **only for cross jobs**
       # -------------------------------------------------------
       - name: Rewrite APT sources for ARM jobs
-        if: matrix.arch != ''          # run only for arm64 / armhf
+        if: matrix.arch != 'amd64'          # run only for arm64 / armhf
         shell: bash
         run: |
           set -eux
       
-          # 1) enable the single foreign arch we’re about to build
+          # Enable the foreign architecture we’re about to build
           sudo dpkg --add-architecture ${{ matrix.arch }}
       
-          # 2) comment-out every security.ubuntu.com entry everywhere
-          sudo find /etc/apt -name '*.list' -exec \
-            sed -Ei '/security\.ubuntu\.com/ s/^/#/' {} +
+          # Remove all security.ubuntu.com entries for the ARM architecture
+          sudo find /etc/apt/sources.list* -exec sed -Ei '/security\.ubuntu\.com/ s/^/#/' {} + 
       
-          # 3) limit the remaining Ubuntu mirrors to amd64 only
-          sudo sed -Ei 's|^deb (.*archive\.ubuntu\.com.*)$|deb [arch=amd64] \1|' \
-            /etc/apt/sources.list || true
+          # Limit the remaining "archive.ubuntu.com" to amd64 only (for native build)
+          sudo sed -Ei 's|^deb (.*archive\.ubuntu\.com.*)$|deb [arch=amd64] \1|' /etc/apt/sources.list || true
           sudo find /etc/apt/sources.list.d -name '*.list' -exec \
-            sed -Ei 's|^deb (.*archive\.ubuntu\.com.*)$|deb [arch=amd64] \1|' {} +
+          sed -Ei 's|^deb (.*archive\.ubuntu\.com.*)$|deb [arch=amd64] \1|' {} +
       
-          # 4) add ports.ubuntu.com for the foreign arch (main + updates + security)
+          # Add the correct ports.ubuntu.com mirrors for the foreign arch (ARM)
           sudo tee /etc/apt/sources.list.d/ubuntu-ports-${{ matrix.arch }}.list >/dev/null <<EOF
           deb [arch=${{ matrix.arch }}] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
           deb [arch=${{ matrix.arch }}] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
           deb [arch=${{ matrix.arch }}] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
           EOF
       
-          # 5) refresh indexes – should hit only archive (amd64) + ports (arm*)
+          # Refresh the apt-get index – only ports should be used for ARM
           sudo apt-get update -o Acquire::Retries=3
       
       # -------------------------------------------------------
