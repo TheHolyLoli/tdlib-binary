@@ -38,7 +38,7 @@ jobs:
 
           CMAKE_EXTRA=""
           if [ -n "${{ matrix.toolchain }}" ]; then
-            CMAKE_EXTRA="-DCMAKE_TOOLCHAIN_FILE=${{ matrix.toolchain }}"
+            CMAKE_EXTRA="-DCMAKE_TOOLCHAIN_FILE=${GITHUB_WORKSPACE}/${{ matrix.toolchain }}"
           fi
 
           cmake .. \
